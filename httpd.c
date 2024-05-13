@@ -22,7 +22,7 @@
 #include <strings.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <pthread.h>
+//#include <pthread.h>
 #include <sys/wait.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -66,8 +66,10 @@ void accept_request(void *arg)
                        * program */
     char *query_string = NULL;
 
+    //获取客户端发送的HTTP报文中的一行
     numchars = get_line(client, buf, sizeof(buf));
     i = 0; j = 0;
+    //获取请求方法：get\post......
     while (!ISspace(buf[i]) && (i < sizeof(method) - 1))
     {
         method[i] = buf[i];
@@ -76,8 +78,10 @@ void accept_request(void *arg)
     j=i;
     method[i] = '\0';
 
+    //不区分大小写比较，只支持GET和POST
     if (strcasecmp(method, "GET") && strcasecmp(method, "POST"))
     {
+        //如果既不是GET也不是POST
         unimplemented(client);
         return;
     }
@@ -397,7 +401,7 @@ void not_found(int client)
  *              file descriptor
  *             the name of the file to serve */
 /**********************************************************************/
-void serve_file(int client, const char *filename)
+void  serve_file(int client, const char *filename)
 {
     FILE *resource = NULL;
     int numchars = 1;
@@ -430,8 +434,9 @@ int startup(u_short *port)
 {
     int httpd = 0;
     int on = 1;
-    struct sockaddr_in name;
+    struct sockaddr_in name;    //建立socket->绑定bind->监听listenning
 
+    //基于IPv4和TCP建立套接字
     httpd = socket(PF_INET, SOCK_STREAM, 0);
     if (httpd == -1)
         error_die("socket");
@@ -488,26 +493,36 @@ void unimplemented(int client)
 
 int main(void)
 {
+    //服务器套接字
     int server_sock = -1;
+    //指定服务器要运行的端口
     u_short port = 4000;
+    //客户端套接字
     int client_sock = -1;
     struct sockaddr_in client_name;
     socklen_t  client_name_len = sizeof(client_name);
-    pthread_t newthread;
+    //pthread_t newthread;
 
+    //建立服务器，监听请求
     server_sock = startup(&port);
     printf("httpd running on port %d\n", port);
 
     while (1)
     {
+        /**
+         * 服务器端使用accept函数来响应客户端的连接请求，并建立与客户端的连接。
+         * 这个函数会提取出所监听套接字的等待连接队列中的第一个连接请求，
+         * 然后创建一个新的套接字，并返回指向该套接字的文件描述符。
+         */
         client_sock = accept(server_sock,
                 (struct sockaddr *)&client_name,
                 &client_name_len);
         if (client_sock == -1)
             error_die("accept");
-        /* accept_request(&client_sock); */
-        if (pthread_create(&newthread , NULL, (void *)accept_request, (void *)(intptr_t)client_sock) != 0)
-            perror("pthread_create");
+        //和客户端正式进行通讯
+        accept_request(&client_sock);
+//        if (pthread_create(&newthread , NULL, (void *)accept_request, (void *)(intptr_t)client_sock) != 0)
+//            perror("pthread_create");
     }
 
     close(server_sock);
